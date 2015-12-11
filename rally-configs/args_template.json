@@ -1,0 +1,19 @@
+{
+    "image_name": "^cirros.*-disk$",
+    "private_key": "/home/aish/.ssh/id_rsa",
+    "controller_creds": [
+      {
+        "ip": "127.0.0.1",
+        "username": "aish",
+        "password": "aish"
+      }
+    ],
+    "compute_creds": [
+      {
+        "ip": "127.0.0.1",
+        "username": "aish",
+        "password": "aish",
+        "port": 22
+      }
+    ]
+}
