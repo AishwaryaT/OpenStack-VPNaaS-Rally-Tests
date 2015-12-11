@@ -48,7 +48,11 @@ class TestVpnTenantScenario(vpn_base.VpnBase):
 
         try:
             self.setup(**kwargs)
+<<<<<<< HEAD
             self.create_tenants()
+=======
+            self.create_tenant()
+>>>>>>> ed7207d9f48176f6011a1efe62146b3e833d62e0
             self.create_networks(**kwargs)
             self.check_route()
             self.ike_policy = self._create_ike_policy(**kwargs)
