@@ -122,8 +122,8 @@ class VpnBase(rally_base.OpenStackScenario):
             kwargs.update({
                 "nics":
                     [{"net-id": self.rally_networks[x]["network"]["id"]}],
-                    "sec_group_suffix": self.suffixes[x],
-                    "server_suffix": self.suffixes[x]
+                "sec_group_suffix": self.suffixes[x],
+                "server_suffix": self.suffixes[x]
             })
             keypair = vpn_utils.create_keypair(
                 self.nova_client, self.suffixes[x])
@@ -485,6 +485,7 @@ class VpnBase(rally_base.OpenStackScenario):
         if self.server_fips:
             vpn_utils.delete_floating_ips(self.nova_client, self.server_fips)
         vpn_utils.delete_keypair(self.nova_client, self.keypairs)
+        vpn_utils.delete_secgroups(self.nova_client)
 
         if self.qrouterns_compute_tuples:
             vpn_utils.delete_hosts_from_knownhosts_file(

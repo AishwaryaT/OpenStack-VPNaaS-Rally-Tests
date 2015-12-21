@@ -26,13 +26,28 @@ https://github.com/openstack/rally/blob/master/README.rst
 
 * Create a rally deployment for your cloud and make sure it is active.
   rally deployment create --file=cloud_cred.json --name=MyCloud
+  You can also create a rally deployment from the environment variables.
+  rally deployment create --fromenv --name=MyCloud
 * Create a folder structure as below
    sudo mkdir /opt/rally
 * Create a symbolic link to the plugins directory
    cd /opt/rally
    sudo ln -s /opt/stack/neutron-vpnaas/rally-jobs/plugins
-* Update the args.json file with the correct credentials
-* Run the tests
+* Run the tests. You can run the tests in various combinations.
+  (a) Single Node with DVR with admin credentials
+  (b) Single Node with DVR with non admin credentials
+  (c) Multi Node with DVR with admin credentials
+  (d) Multi Node with DVR with non admin credentials
+  (e) Single Node, Non DVR with non admin credentials
+  (f) Multi Node, Non DVR with non admin credentials
+
+  -> Create a args.json file with the correct credentials depending on whether it is a
+  single node or multinode cloud. A args_template.json file is available at
+  /opt/stack/neutron-vpnaas/rally-jobs/rally-configs/args_template.json for your reference.
+  -> Update the rally_config_dvr.yaml or rally_config_non_dvr.yaml file to change the
+  admin/non_admin credentials.
+  -> Use the appropriate config files to run either dvr or non_dvr tests.
+
   With DVR:
    rally task start /opt/stack/neutron-vpnaas/rally-jobs/rally-configs/rally_config_dvr.yaml
    --task-args-file /opt/stack/neutron-vpnaas/rally-jobs/rally-configs/args.json
@@ -40,6 +55,10 @@ https://github.com/openstack/rally/blob/master/README.rst
   Non DVR:
   rally task start /opt/stack/neutron-vpnaas/rally-jobs/rally-configs/rally_config_non_dvr.yaml
    --task-args-file /opt/stack/neutron-vpnaas/rally-jobs/rally-configs/args.json
+
+   **Note:
+   Non DVR scenario can only be run as admin as you need admin credentials to create
+   a non DVR router.
 
 External Resources:
 ===================
