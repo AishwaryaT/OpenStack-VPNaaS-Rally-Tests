@@ -4,15 +4,13 @@
     "controller_creds": [
       {
         "ip": "127.0.0.1",
-        "username": "aish",
-        "password": "aish"
+        "username": "aish"
       }
     ],
     "compute_creds": [
       {
         "ip": "127.0.0.1",
         "username": "aish",
-        "password": "aish",
         "port": 22
       }
     ]

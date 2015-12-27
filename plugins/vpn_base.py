@@ -45,7 +45,8 @@ class VpnBase(rally_base.OpenStackScenario):
             else:
                 self.neutron_client = self.clients("neutron")
                 self.nova_client = self.clients("nova")
-            self.suffixes = [uuidutils.generate_uuid(),] * 2
+            self.suffixes = [uuidutils.generate_uuid(),
+                             uuidutils.generate_uuid()]
             self.remote_key_files = ['rally_keypair_' + x for x in self.suffixes]
             self.local_key_files = ['/tmp/' + x for x in self.remote_key_files]
             self.keypairs = []

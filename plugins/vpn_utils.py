@@ -39,38 +39,32 @@ def execute_cmd_over_ssh(host, cmd):
     :return: Output of the executed command
     """
     LOG.debug('EXECUTE COMMAND <%s> OVER SSH', cmd)
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     k = paramiko.RSAKey.from_private_key_file(PRIVATE_KEY)
     try:
-        ssh.connect(host["ip"],
-                    username=host["username"],
-                    password=host["password"],
-                    pkey=k)
+        client.connect(host["ip"], pkey=k)
     except paramiko.BadHostKeyException as e:
         raise exceptions.Exception(
-                "BADHOSTKEYEXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+                "BADHOSTKEY EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
     except paramiko.AuthenticationException as e:
         raise exceptions.Exception(
-                "AUTHENTICATIONEXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
     except paramiko.SSHException as e:
         raise exceptions.Exception(
-                "SSHEXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+                "SSH EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
     except socket.error as e:
         raise exceptions.Exception(
-                "SOCKETERROR WHEN CONNECTING TO %s", host["ip"], e)
+                "SOCKET ERROR WHEN CONNECTING TO %s", host["ip"], e)
     LOG.debug("CONNECTED TO HOST <%s>", host["ip"])
     try:
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        stdin.write(host["password"] + '\n')
-        stdin.flush()
-        result = stdout.read().splitlines()
-        return result
+        stdin, stdout, stderr = client.exec_command(cmd)
+        return stdout.read().splitlines()
     except paramiko.SSHException as e:
         raise exceptions.Exception(
                 "SSHEXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
     finally:
-        ssh.close()
+        client.close()
 
 
 def create_tenant(keystone_client, tenant_suffix):
@@ -227,30 +221,41 @@ def write_key_to_compute_node(keypair, local_path, remote_path, host):
     :param host: compute host credentials
     :return:
     """
+
     LOG.debug("WRITING PRIVATE KEY TO COMPUTE NODE")
     k = paramiko.RSAKey.from_private_key_file(PRIVATE_KEY)
     write_key_to_local_path(keypair, local_path)
     try:
-        t = paramiko.Transport(host['ip'], host['port'])
-    except Exception as e:
+        transport = paramiko.Transport(host['ip'], host['port'])
+    except paramiko.SSHException as e:
         raise exceptions.Exception(
             "PARAMIKO TRANSPORT FAILED. CHECK IF THE HOST IP %s AND PORT %s "
             "ARE CORRECT %s", host['ip'], host['port'], e)
 
     try:
-        t.connect(username=host['username'], password=host['password'], pkey=k)
-        sftp = paramiko.SFTPClient.from_transport(t)
-    except paramiko.ssh_exception.AuthenticationException as e:
-        t.close()
-        raise exceptions.Exception("SFTP AUTHENTICATION FAILED", e)
+        transport.connect(
+                username=host['username'], pkey=k)
+    except paramiko.BadHostKeyException as e:
+        transport.close()
+        raise exceptions.Exception(
+                "BADHOSTKEY EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+    except paramiko.AuthenticationException as e:
+        transport.close()
+        raise exceptions.Exception(
+                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+    except paramiko.SSHException as e:
+        transport.close()
+        raise exceptions.Exception(
+                "SSH EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+    LOG.debug("CONNECTED TO HOST <%s>", host["ip"])
 
     try:
-        sftp.put(local_path, remote_path)
+        sftp_client = paramiko.SFTPClient.from_transport(transport)
+        sftp_client.put(local_path, remote_path)
     except IOError as e:
         raise exceptions.Exception("FILE PATH DOESN'T EXIST", e)
     finally:
-        sftp.close()
-        t.close()
+        transport.close()
 
 
 def create_server(nova_client, keypair, **kwargs):
