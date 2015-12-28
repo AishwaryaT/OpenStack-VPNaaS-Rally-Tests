@@ -27,16 +27,6 @@ LOG = logging.getLogger(__name__)
 SUBNET_IP_VERSION = 4
 START_CIDR = "10.2.0.0/24"
 EXT_NET_CIDR = "172.16.1.0/24"
-#PRIVATE_KEY = "/home/aish/.ssh/id_rsa"
-
-#
-# def set_private_key_path(private_key):
-#     """Set private key path
-#
-#     :param private_key: path to private_key_file
-#     """
-#     global PRIVATE_KEY
-#     PRIVATE_KEY = private_key
 
 
 def execute_cmd_over_ssh(host, cmd, private_key):
