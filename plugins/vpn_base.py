@@ -49,6 +49,7 @@ class VpnBase(rally_base.OpenStackScenario):
                              uuidutils.generate_uuid()]
             self.remote_key_files = ['rally_keypair_' + x for x in self.suffixes]
             self.local_key_files = ['/tmp/' + x for x in self.remote_key_files]
+            self.private_key_file = kwargs["private_key"]
             self.keypairs = []
             self.tenant_ids = []
             self.ns_controller_tuples = []
@@ -104,12 +105,14 @@ class VpnBase(rally_base.OpenStackScenario):
                 ns, controller = vpn_utils.wait_for_namespace_creation(
                     "snat-", router["router"]['id'],
                     kwargs['controller_creds'],
+                    self.private_key_file,
                     kwargs['namespace_creation_timeout'])
             else:
-                ns, controller = (vpn_utils.wait_for_namespace_creation(
+                ns, controller = vpn_utils.wait_for_namespace_creation(
                     "qrouter-", router["router"]['id'],
                     kwargs['controller_creds'],
-                    kwargs['namespace_creation_timeout']))
+                    self.private_key_file,
+                    kwargs['namespace_creation_timeout'])
             with LOCK:
                 self.ns_controller_tuples.append((ns, controller))
 
@@ -137,11 +140,13 @@ class VpnBase(rally_base.OpenStackScenario):
                 qrouter, compute = vpn_utils.wait_for_namespace_creation(
                     "qrouter-", self.router_ids[x],
                     kwargs['compute_creds'],
+                    self.private_key_file,
                     kwargs['namespace_creation_timeout'])
 
                 vpn_utils.write_key_to_compute_node(
                     keypair, self.local_key_files[x],
-                    self.remote_key_files[x], compute)
+                    self.remote_key_files[x], compute,
+                    self.private_key_file)
                 with LOCK:
                     self.qrouterns_compute_tuples.append((qrouter, compute))
             else:
@@ -155,7 +160,8 @@ class VpnBase(rally_base.OpenStackScenario):
         LOG.debug("VERIFY ROUTE EXISTS BETWEEN THE ROUTER GATEWAYS")
         for tuple in self.ns_controller_tuples:
             for ip in self.rally_router_gw_ips:
-                assert(True == vpn_utils.ping_router_gateway(tuple, ip)), (
+                assert(vpn_utils.ping_router_gateway(
+                        tuple, ip, self.private_key_file)), (
                         "PING TO IP " + ip + " FAILED")
 
     @atomic.action_timer("_create_ike_policy")
@@ -372,7 +378,8 @@ class VpnBase(rally_base.OpenStackScenario):
         :return: qg-interface
         """
         qg = vpn_utils.get_interfaces(
-            self.ns_controller_tuples[peer_index])
+            self.ns_controller_tuples[peer_index],
+            self.private_key_file)
         p = re.compile(r"qg-\w+-\w+")
         for line in qg:
             m = p.search(line)
@@ -399,19 +406,21 @@ class VpnBase(rally_base.OpenStackScenario):
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as e:
                 tcpdump_future = e.submit(vpn_utils.start_tcpdump,
                          self.ns_controller_tuples[peer_index],
-                         qg_interface)
+                         qg_interface, self.private_key_file)
                 if(kwargs["DVR_flag"]):
                     ssh_future = e.submit(
                         vpn_utils.ssh_and_ping_server,
                         self.server_private_ips[local_index],
                         self.server_private_ips[peer_index],
                         self.qrouterns_compute_tuples[local_index],
-                        self.remote_key_files[local_index])
+                        self.remote_key_files[local_index],
+                        self.private_key_file)
                 else:
                     ssh_future = e.submit(
                         vpn_utils.ssh_and_ping_server_with_fip,
                         self.server_fips[local_index],
-                        self.server_private_ips[peer_index])
+                        self.server_private_ips[peer_index],
+                        self.private_key_file)
 
             assert(ssh_future.result()), "SSH/Ping failed"
             for line in tcpdump_future.result():
@@ -482,15 +491,16 @@ class VpnBase(rally_base.OpenStackScenario):
         vpn_utils.delete_servers(self.nova_client, self.servers)
         if self.server_fips:
             vpn_utils.delete_floating_ips(self.nova_client, self.server_fips)
-        vpn_utils.delete_keypair(self.nova_client, self.keypairs)
+        vpn_utils.delete_keypairs(self.nova_client, self.keypairs)
         vpn_utils.delete_secgroups(self.nova_client)
 
         if self.qrouterns_compute_tuples:
             vpn_utils.delete_hosts_from_knownhosts_file(
-                self.server_private_ips, self.qrouterns_compute_tuples)
+                self.server_private_ips, self.qrouterns_compute_tuples,
+                self.private_key_file)
             vpn_utils.delete_keyfiles(
                 self.local_key_files, self.remote_key_files,
-                self.qrouterns_compute_tuples)
+                self.qrouterns_compute_tuples, self.private_key_file)
         else:
             ## cleanup for non dvr, fip
             pass

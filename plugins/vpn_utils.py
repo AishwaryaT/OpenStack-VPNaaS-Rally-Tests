@@ -27,21 +27,32 @@ LOG = logging.getLogger(__name__)
 SUBNET_IP_VERSION = 4
 START_CIDR = "10.2.0.0/24"
 EXT_NET_CIDR = "172.16.1.0/24"
-PRIVATE_KEY = "/home/aish/.ssh/id_rsa"
+#PRIVATE_KEY = "/home/aish/.ssh/id_rsa"
 
-def execute_cmd_over_ssh(host, cmd):
+#
+# def set_private_key_path(private_key):
+#     """Set private key path
+#
+#     :param private_key: path to private_key_file
+#     """
+#     global PRIVATE_KEY
+#     PRIVATE_KEY = private_key
+
+
+def execute_cmd_over_ssh(host, cmd, private_key):
     """Run the given command over ssh
 
     Using paramiko package, it creates a connection to the given host;
     executes the required command on it and returns the output.
     :param host: Dictionary of ip, username and password
     :param cmd: Command to be run over ssh
+    :param private_key: path to private key file
     :return: Output of the executed command
     """
     LOG.debug('EXECUTE COMMAND <%s> OVER SSH', cmd)
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    k = paramiko.RSAKey.from_private_key_file(PRIVATE_KEY)
+    k = paramiko.RSAKey.from_private_key_file(private_key)
     try:
         client.connect(host["ip"], pkey=k)
     except paramiko.BadHostKeyException as e:
@@ -207,7 +218,8 @@ def write_key_to_local_path(keypair, local_key_file):
     f.close()
 
 
-def write_key_to_compute_node(keypair, local_path, remote_path, host):
+def write_key_to_compute_node(keypair, local_path, remote_path, host,
+                              private_key):
     """Write the private key of the nova instance to the compute node
 
     First fetches the private key from the keypair and writes it to a
@@ -219,11 +231,12 @@ def write_key_to_compute_node(keypair, local_path, remote_path, host):
     :param remote_path: path where the private key file has to be placed
                         in the remote machine
     :param host: compute host credentials
+    :param private_key: path to private key file
     :return:
     """
 
     LOG.debug("WRITING PRIVATE KEY TO COMPUTE NODE")
-    k = paramiko.RSAKey.from_private_key_file(PRIVATE_KEY)
+    k = paramiko.RSAKey.from_private_key_file(private_key)
     write_key_to_local_path(keypair, local_path)
     try:
         transport = paramiko.Transport(host['ip'], host['port'])
@@ -339,21 +352,23 @@ def add_floating_ip(nova_client, server):
         return floating_ip
 
 
-def get_namespace(host):
+def get_namespace(host, private_key):
     """SSH into the host and get the namespaces
 
     :param host : dictionary of controller/compute node credentials
      {ip:x.x.x.x, username:xxx, password:xxx}
+    :param private_key: path to private key file
     :return: namespaces
     """
     LOG.debug("GET NAMESPACES")
     cmd = "sudo ip netns"
-    namespaces = execute_cmd_over_ssh(host, cmd)
+    namespaces = execute_cmd_over_ssh(host, cmd, private_key)
     LOG.debug("NAMESPACES %s", namespaces)
     return namespaces
 
 
-def wait_for_namespace_creation(namespace_tag, router_id, hosts, timeout=60):
+def wait_for_namespace_creation(namespace_tag, router_id, hosts, private_key,
+                                timeout=60):
     """Wait for the namespace creation
 
     Get into each of the controllers/compute nodes and check which one contains
@@ -363,13 +378,14 @@ def wait_for_namespace_creation(namespace_tag, router_id, hosts, timeout=60):
     :param namespace_tag: which namespace ("snat_" or "qrouter_")
     :param router_id: uuid of the rally_router
     :param hosts: controllers or compute hosts
+    :param private_key: path to private key file
     :param timeout: namespace creation time
     :return:
     """
     start_time = time.time()
     while True:
         for host in hosts:
-            namespaces = get_namespace(host)
+            namespaces = get_namespace(host, private_key)
             for line in namespaces:
                 if line == (namespace_tag + router_id):
                     namespace_tag = line
@@ -380,9 +396,9 @@ def wait_for_namespace_creation(namespace_tag, router_id, hosts, timeout=60):
                                        " NAMESPACES TO BE CREATED")
 
 
-def ping(host, cmd):
+def ping(host, cmd, private_key):
     """Execute ping command over ssh"""
-    ping_result = execute_cmd_over_ssh(host, cmd)
+    ping_result = execute_cmd_over_ssh(host, cmd, private_key)
     if ping_result:
         LOG.debug("PING RESULT %s", ping_result)
         return True
@@ -390,13 +406,14 @@ def ping(host, cmd):
         return False
 
 
-def ping_router_gateway(namespace_controller_tuple, router_gw_ip):
+def ping_router_gateway(namespace_controller_tuple, router_gw_ip, private_key):
     """Ping the ip address from network namespace
 
     Get into controller's snat-namespaces and ping the peer router gateway ip.
     :param namespace_controller_tuple: namespace, controller tuple. (It's the
                                  controller that contains the namespace )
     :param router_gw_ip: ip address to be pinged
+    :param private_key: path to private key file
     :return: True if ping succeeds
              False if ping fails
     """
@@ -405,27 +422,28 @@ def ping_router_gateway(namespace_controller_tuple, router_gw_ip):
     count = 4
     cmd = "sudo ip netns exec {} ping -w {} -c {} {}".format(
         namespace, 2 * count, count, router_gw_ip)
-    return ping(controller, cmd)
+    return ping(controller, cmd, private_key)
 
 
-def get_interfaces(namespace_controller_tuple):
+def get_interfaces(namespace_controller_tuple, private_key):
     """Get the interfaces
 
     Get into the controller's snat namespace and list the interfaces.
     :param namespace_controller_tuple: namespace, controller tuple(the
                                        controller that contains the namespace).
+    :param private_key: path to private key file
     :return: interfaces
     """
     namespace, controller = namespace_controller_tuple
     LOG.debug("GET THE INTERFACES BY USING 'ip a' FROM THE NAMESPACE %s",
               namespace)
     cmd = "sudo ip netns exec {} ip a".format(namespace)
-    interfaces = execute_cmd_over_ssh(controller, cmd)
+    interfaces = execute_cmd_over_ssh(controller, cmd, private_key)
     LOG.debug("INTERFACES %s", interfaces)
     return interfaces
 
 
-def start_tcpdump(namespace_controller_tuple, interface):
+def start_tcpdump(namespace_controller_tuple, interface, private_key):
     """Start the tcpdump at the given interface
 
     Get into the controller's snat namespace and start a tcp dump at the
@@ -433,6 +451,7 @@ def start_tcpdump(namespace_controller_tuple, interface):
     :param namespace_controller_tuple: namespace, controller tuple. (It's the
                                  controller that contains the namespace )
     :param interface: interface
+    :param private_key: path to private key file
     :return: tcpdump output
     """
     namespace, controller = namespace_controller_tuple
@@ -440,12 +459,13 @@ def start_tcpdump(namespace_controller_tuple, interface):
               " %s", interface, namespace)
     cmd = ("sudo ip netns exec {} timeout 15 tcpdump -n -i {}"
            .format(namespace, interface))
-    tcpdump = execute_cmd_over_ssh(controller, cmd)
+    tcpdump = execute_cmd_over_ssh(controller, cmd, private_key)
     LOG.debug("TCPDUMP %s", tcpdump)
     return tcpdump
 
 
-def ssh_and_ping_server(local_server, peer_server, ns_compute_tuple, keyfile):
+def ssh_and_ping_server(local_server, peer_server, ns_compute_tuple, keyfile,
+                        private_key):
     """SSH and ping the nova instance from the namespace
 
      Get into the compute node's qrouter namespace and then ssh into the local
@@ -454,7 +474,8 @@ def ssh_and_ping_server(local_server, peer_server, ns_compute_tuple, keyfile):
     :param peer_server: private ip of the server to ping to
     :param ns_compute_tuple: namespace, compute tuple. (It's the
                                  compute node that contains the namespace )
-    :param keyfile: path to private key file
+    :param keyfile: path to private key file of the nova instance
+    :param private_key: path to private key file
     :return: True if ping succeeds
              False if ping fails
     """
@@ -466,15 +487,16 @@ def ssh_and_ping_server(local_server, peer_server, ns_compute_tuple, keyfile):
     cmd = ("sudo ip netns exec {} ssh -v -o StrictHostKeyChecking=no -o"
            "HashKnownHosts=no -i {} {} ping -w {} -c {} {}"
            .format(namespace, keyfile, host, 2 * count, count, peer_server))
-    return ping(compute_host, cmd)
+    return ping(compute_host, cmd, private_key)
 
 
-def ssh_and_ping_server_with_fip(local_server, peer_server):
+def ssh_and_ping_server_with_fip(local_server, peer_server, private_key):
     """SSH into the local nova instance and ping the peer instance using fips
 
     :param local_server: fip of the server to ssh into
     :param peer_server: private ip of the server to ping to
-    param keyfile: path to private key file
+    param keyfile: path to private key file of the nova instance
+    :param private_key: path to private key file
     :return: True if ping succeeds
              False if ping fails
     """
@@ -483,7 +505,7 @@ def ssh_and_ping_server_with_fip(local_server, peer_server):
     count = 20
     host = {"ip": local_server, "username": "cirros", "password": "cubswin:)"}
     cmd = "sudo ping -w {} -c{} {}".format(2 * count, count, peer_server)
-    return ping(host, cmd)
+    return ping(host, cmd, private_key)
 
 
 def delete_servers(nova_client, servers):
@@ -514,7 +536,7 @@ def delete_floating_ips(nova_client, fips):
         nova_client.floating_ips.delete(fip['floating_ip']['id'])
 
 
-def delete_keypair(nova_client, keypairs):
+def delete_keypairs(nova_client, keypairs):
     """Delete key pairs
 
     :param nova_client: nova client
@@ -582,13 +604,15 @@ def delete_tenants(keystone_client, tenant_ids):
         keystone_client.tenants.delete(id)
 
 
-def delete_keyfiles(local_key_files, remote_key_files, ns_compute_tuples):
+def delete_keyfiles(local_key_files, remote_key_files, ns_compute_tuples,
+                    private_key):
     """Delete the SSH keyfiles from the compute and the local nodes
 
     :param local_key_files: paths to ssh key files in local node
     :param remote_key_files: paths to ssh key files in compute nodes
     :param ns_compute_tuples: namespace, compute tuple. (It's the
                               compute node that contains the namespace )
+    :param private_key: path to private key file
     :return:
     """
     LOG.debug("DELETING RALLY KEY FILES FROM LOCAL MACHINE")
@@ -600,19 +624,21 @@ def delete_keyfiles(local_key_files, remote_key_files, ns_compute_tuples):
     for key, ns_comp in zip(remote_key_files, ns_compute_tuples):
         cmd = "sudo rm -f {}".format(key)
         host = ns_comp[1]
-        execute_cmd_over_ssh(host, cmd)
+        execute_cmd_over_ssh(host, cmd, private_key)
 
 
-def delete_hosts_from_knownhosts_file(hosts, ns_compute_tuples):
+def delete_hosts_from_knownhosts_file(hosts, ns_compute_tuples,
+                                      private_key):
     """Remove the hosts from the knownhosts file
 
     :param hosts: host ips to be removed from /root/.ssh/knownhosts
     :param ns_compute_tuples: namespace, compute tuple. (It's the
                               compute node that contains the namespace )
+    :param private_key: path to private key file
     :return:
     """
     LOG.debug("DELETES HOSTS FROM THE KNOWNHOSTS FILE")
     for host, ns_comp in zip(hosts, ns_compute_tuples):
         compute_host = ns_comp[1]
         cmd = ("sudo ssh-keygen -f /root/.ssh/known_hosts -R {}".format(host))
-        execute_cmd_over_ssh(compute_host, cmd)
+        execute_cmd_over_ssh(compute_host, cmd, private_key)
