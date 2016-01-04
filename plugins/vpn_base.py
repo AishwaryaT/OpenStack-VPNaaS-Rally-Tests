@@ -492,8 +492,7 @@ class VpnBase(rally_base.OpenStackScenario):
         if self.server_fips:
             vpn_utils.delete_floating_ips(self.nova_client, self.server_fips)
         vpn_utils.delete_keypairs(self.nova_client, self.keypairs)
-        vpn_utils.delete_secgroups(self.nova_client)
-
+        
         if self.qrouterns_compute_tuples:
             vpn_utils.delete_hosts_from_knownhosts_file(
                 self.server_private_ips, self.qrouterns_compute_tuples,

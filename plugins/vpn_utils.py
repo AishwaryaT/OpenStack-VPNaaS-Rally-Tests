@@ -501,18 +501,25 @@ def ssh_and_ping_server_with_fip(local_server, peer_server, private_key):
 def delete_servers(nova_client, servers):
     """Delete nova servers
 
-    It deletes the nova servers.
+    It deletes the nova servers, associated security groups.
+
     :param nova_client: nova client
     :param servers: nova instances to be deleted
     :return:
     """
     for server in servers:
-        LOG.debug("DELETING NOVA INSTANCE %s", server.id)
+        LOG.debug("DELETING NOVA INSTANCE: %s", server.id)
+        sec_group_name = server.security_groups[0]['name']
         nova_client.servers.delete(server.id)
 
         LOG.debug("WAITING FOR INSTANCE TO GET DELETED")
         task_utils.wait_for_delete(
             server, update_resource=task_utils.get_from_manager())
+
+        for secgroup in nova_client.security_groups.list():
+            if secgroup.name == sec_group_name:
+                LOG.debug("DELETING SEC_GROUP: %s", sec_group_name)
+                nova_client.security_groups.delete(secgroup.id)
 
 
 def delete_floating_ips(nova_client, fips):

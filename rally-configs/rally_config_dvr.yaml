@@ -30,8 +30,8 @@
 
       runner:
         type: "constant"
-        times: 1
-        concurrency: 1
+        times: 3
+        concurrency: 5
 
       context:
         users:
@@ -61,8 +61,8 @@
 #
 #      runner:
 #        type: "constant"
-#        times: 1
-#        concurrency: 1
+#        times: 3
+#        concurrency: 5
 #
 #      context:
 #        users:
@@ -92,8 +92,8 @@
 #
 #      runner:
 #        type: "constant"
-#        times: 1
-#        concurrency: 1
+#        times: 3
+#        concurrency: 5
 #
 #      context:
 #        users:
