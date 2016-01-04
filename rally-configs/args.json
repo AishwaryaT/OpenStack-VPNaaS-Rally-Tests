@@ -4,37 +4,31 @@
     "controller_creds": [
       {
         "ip": "10.241.156.21",
-        "username": "stack",
-        "password": "stack"
+        "username": "stack"
       },
       {
         "ip": "10.241.156.22",
-        "username": "stack",
-        "password": "stack"
+        "username": "stack"
       },
       {
         "ip": "10.241.156.23",
-        "username": "stack",
-        "password": "stack"
+        "username": "stack"
       }
     ],
     "compute_creds": [
       {
         "ip": "10.241.156.18",
         "username": "stack",
-        "password": "stack",
         "port": 22
       },
       {
         "ip": "10.241.156.19",
         "username": "stack",
-        "password": "stack",
         "port": 22
       },
       {
         "ip": "10.241.156.20",
         "username": "stack",
-        "password": "stack",
         "port": 22
       }
     ]

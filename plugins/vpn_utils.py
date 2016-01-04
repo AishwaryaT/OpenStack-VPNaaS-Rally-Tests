@@ -50,7 +50,8 @@ def execute_cmd_over_ssh(host, cmd, private_key):
                 "BADHOSTKEY EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
     except paramiko.AuthenticationException as e:
         raise exceptions.Exception(
-                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s",
+                host["ip"], e)
     except paramiko.SSHException as e:
         raise exceptions.Exception(
                 "SSH EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
@@ -163,7 +164,6 @@ def create_network(neutron_client, neutron_admin_client, network_suffix,
                     LOG.debug("EXTERNAL NETWORK ALREADY EXISTS")
         return ext_network_id
 
-
     def _create_external_network():
         """Creat external network and subnet"""
 
@@ -245,7 +245,8 @@ def write_key_to_compute_node(keypair, local_path, remote_path, host,
     except paramiko.AuthenticationException as e:
         transport.close()
         raise exceptions.Exception(
-                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s", host["ip"], e)
+                "AUTHENTICATION EXCEPTION WHEN CONNECTING TO %s",
+                host["ip"], e)
     except paramiko.SSHException as e:
         transport.close()
         raise exceptions.Exception(
@@ -501,18 +502,25 @@ def ssh_and_ping_server_with_fip(local_server, peer_server, private_key):
 def delete_servers(nova_client, servers):
     """Delete nova servers
 
-    It deletes the nova servers.
+    It deletes the nova servers, associated security groups.
+
     :param nova_client: nova client
     :param servers: nova instances to be deleted
     :return:
     """
     for server in servers:
-        LOG.debug("DELETING NOVA INSTANCE %s", server.id)
+        LOG.debug("DELETING NOVA INSTANCE: %s", server.id)
+        sec_group_name = server.security_groups[0]['name']
         nova_client.servers.delete(server.id)
 
         LOG.debug("WAITING FOR INSTANCE TO GET DELETED")
         task_utils.wait_for_delete(
             server, update_resource=task_utils.get_from_manager())
+
+        for secgroup in nova_client.security_groups.list():
+            if secgroup.name == sec_group_name:
+                LOG.debug("DELETING SEC_GROUP: %s", sec_group_name)
+                nova_client.security_groups.delete(secgroup.id)
 
 
 def delete_floating_ips(nova_client, fips):
@@ -537,11 +545,6 @@ def delete_keypairs(nova_client, keypairs):
         LOG.debug("DELETING KEY_PAIR %s", key_pair.name)
         nova_client.keypairs.delete(key_pair.id)
 
-def delete_secgroups(nova_client):
-    for secgroup in nova_client.security_groups.list():
-        if "rally" in secgroup.name:
-            LOG.debug("DELETING SEC_GROUP %s", secgroup.name)
-            nova_client.security_groups.delete(secgroup.id)
 
 def delete_networks(neutron_client, neutron_admin_client,
                    routers, networks, subnets):
